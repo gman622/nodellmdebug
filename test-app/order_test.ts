@@ -1,4 +1,4 @@
-import { describe, it, beforeAll, afterAll } from "@std/testing/bdd";
+import { afterAll, beforeAll, describe, it } from "@std/testing/bdd";
 import { assertEquals } from "@std/assert";
 
 describe("order pricing with promo codes", () => {
@@ -40,7 +40,9 @@ describe("order pricing with promo codes", () => {
 
   describe("when SUMMER promo is applied (amount stored as number)", () => {
     it("should calculate total = promo.amount + handlingFee + product.price", async () => {
-      const res = await fetch("http://localhost:3000/?product=mouse&promo=SUMMER");
+      const res = await fetch(
+        "http://localhost:3000/?product=mouse&promo=SUMMER",
+      );
       const data = await res.json();
       // 10 + 5 + 49.99 = 64.99
       assertEquals(typeof data.total, "number");
@@ -50,7 +52,9 @@ describe("order pricing with promo codes", () => {
 
   describe("when WELCOME promo is applied (amount stored as string by legacy service)", () => {
     it("should calculate total = promo.amount + handlingFee + product.price", async () => {
-      const res = await fetch("http://localhost:3000/?product=mouse&promo=WELCOME");
+      const res = await fetch(
+        "http://localhost:3000/?product=mouse&promo=WELCOME",
+      );
       const data = await res.json();
       // Expected: 15 + 5 + 49.99 = 69.99
       // Actual: "15" + 5 + 49.99 = "15549.99" (string concatenation)

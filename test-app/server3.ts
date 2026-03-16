@@ -19,7 +19,9 @@ Deno.serve({ port: 3000 }, async (req: Request) => {
   if (req.method === "GET" && collection && id) {
     const entry = await kv.get([collection, id]);
     if (!entry.value) {
-      return new Response(JSON.stringify({ error: "not found" }), { status: 404 });
+      return new Response(JSON.stringify({ error: "not found" }), {
+        status: 404,
+      });
     }
     return new Response(JSON.stringify(entry.value));
   }

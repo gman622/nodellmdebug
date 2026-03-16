@@ -38,12 +38,14 @@ function parseArgs(args: string[]): {
   }
 
   const missing = ["run", "target", "lines", "trigger"].filter(
-    (f) => !flagMap[f]
+    (f) => !flagMap[f],
   );
   if (missing.length > 0) {
-    console.error(`Missing required flags: ${missing.map((f) => `--${f}`).join(", ")}`);
     console.error(
-      `Usage: deno run --allow-all src/main.ts --run "deno run --inspect ..." --target file.ts --lines 10,11,13 --trigger "curl ..."`
+      `Missing required flags: ${missing.map((f) => `--${f}`).join(", ")}`,
+    );
+    console.error(
+      `Usage: deno run --allow-all src/main.ts --run "deno run --inspect ..." --target file.ts --lines 10,11,13 --trigger "curl ..."`,
     );
     Deno.exit(1);
   }
@@ -65,7 +67,10 @@ class CDPClient {
     resolve: (v: CDPResponse) => void;
     reject: (e: Error) => void;
   }>();
-  private eventHandlers = new Map<string, (params: Record<string, unknown>) => void>();
+  private eventHandlers = new Map<
+    string,
+    (params: Record<string, unknown>) => void
+  >();
   private ready: Promise<void>;
 
   constructor(wsUrl: string) {
@@ -95,7 +100,10 @@ class CDPClient {
     await this.ready;
   }
 
-  send(method: string, params: Record<string, unknown> = {}): Promise<CDPResponse> {
+  send(
+    method: string,
+    params: Record<string, unknown> = {},
+  ): Promise<CDPResponse> {
     const id = ++this.msgId;
     return new Promise((resolve, reject) => {
       this.pending.set(id, { resolve, reject });
@@ -126,7 +134,9 @@ async function getInspectorUrl(process: Deno.ChildProcess): Promise<string> {
   try {
     while (true) {
       const { value, done } = await reader.read();
-      if (done) throw new Error("Process exited before inspector URL was found");
+      if (done) {
+        throw new Error("Process exited before inspector URL was found");
+      }
       buffer += decoder.decode(value);
       const match = buffer.match(/ws:\/\/[^\s]+/);
       if (match) {
@@ -143,7 +153,7 @@ async function getInspectorUrl(process: Deno.ChildProcess): Promise<string> {
 
 async function captureLocalsFromScopes(
   cdp: CDPClient,
-  callFrame: Record<string, unknown>
+  callFrame: Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
   const locals: Record<string, unknown> = {};
   const scopeChain = callFrame.scopeChain as Array<Record<string, unknown>>;
@@ -182,17 +192,27 @@ async function captureLocalsFromScopes(
           const inner = r.result as Record<string, unknown>;
 
           // Check for errors (TDZ, ReferenceError)
-          if (inner?.subtype === "error" || (inner as Record<string,unknown>)?.className?.toString().includes("Error")) {
+          if (
+            inner?.subtype === "error" ||
+            (inner as Record<string, unknown>)?.className?.toString().includes(
+              "Error",
+            )
+          ) {
             return { name, value: null };
           }
           // Also check exceptionDetails
-          const exceptionDetails = r.exceptionDetails as Record<string, unknown> | undefined;
+          const exceptionDetails = r.exceptionDetails as
+            | Record<string, unknown>
+            | undefined;
           if (exceptionDetails) {
             return { name, value: null };
           }
 
           // Primitive values
-          if (inner?.type === "string" || inner?.type === "number" || inner?.type === "boolean") {
+          if (
+            inner?.type === "string" || inner?.type === "number" ||
+            inner?.type === "boolean"
+          ) {
             return { name, value: inner.value };
           }
           if (inner?.type === "undefined") {
@@ -223,7 +243,9 @@ async function captureLocalsFromScopes(
             const jr = jsonEval.result as Record<string, unknown>;
             const jInner = jr.result as Record<string, unknown>;
             if (jInner?.value && typeof jInner.value === "string") {
-              try { return { name, value: JSON.parse(jInner.value) }; } catch { /* parse failed */ }
+              try {
+                return { name, value: JSON.parse(jInner.value) };
+              } catch { /* parse failed */ }
               return { name, value: jInner.value };
             }
           }
@@ -232,7 +254,7 @@ async function captureLocalsFromScopes(
         } catch {
           return { name, value: "<capture-error>" };
         }
-      })
+      }),
     );
 
     for (const { name, value } of evaluations) {
@@ -249,7 +271,7 @@ async function captureLocalsFromScopes(
 function findCompiledLine(
   tsLine: number,
   originalLines: string[],
-  compiledLines: string[]
+  compiledLines: string[],
 ): number {
   const tsContent = originalLines[tsLine - 1]?.trim();
   if (!tsContent) return -1;
@@ -271,11 +293,15 @@ function findCompiledLine(
   const identifiers = tsContent.match(/\b\w+\b/g) || [];
   const significantIds = identifiers.filter(
     (id) =>
-      !["const", "let", "var", "return", "new", "function", "if", "else", "for"].includes(id)
+      !["const", "let", "var", "return", "new", "function", "if", "else", "for"]
+        .includes(id),
   );
   for (let i = 0; i < compiledLines.length; i++) {
     const compiled = compiledLines[i];
-    if (significantIds.length > 0 && significantIds.every((id) => compiled.includes(id))) {
+    if (
+      significantIds.length > 0 &&
+      significantIds.every((id) => compiled.includes(id))
+    ) {
       return i;
     }
   }
@@ -320,7 +346,9 @@ async function main() {
     cdp.on("Debugger.scriptParsed", (params) => {
       const url = params.url as string;
       if (url && url.includes(config.target.replace(/^\.\//, ""))) {
-        console.error(`[nodellmdebug] Found target script: ${url} (scriptId=${params.scriptId})`);
+        console.error(
+          `[nodellmdebug] Found target script: ${url} (scriptId=${params.scriptId})`,
+        );
         targetScriptId = params.scriptId as string;
       }
     });
@@ -338,7 +366,9 @@ async function main() {
     }
 
     // Get compiled source and build source map: TS line -> compiled line
-    const sourceResp = await cdp.send("Debugger.getScriptSource", { scriptId: targetScriptId });
+    const sourceResp = await cdp.send("Debugger.getScriptSource", {
+      scriptId: targetScriptId,
+    });
     const sourceResult = sourceResp.result as Record<string, unknown>;
     const compiledSource = sourceResult.scriptSource as string;
     const compiledLines = compiledSource.split("\n");
@@ -354,12 +384,18 @@ async function main() {
     for (const line of config.lines) {
       const compiledLine = findCompiledLine(line, originalLines, compiledLines);
       if (compiledLine === -1) {
-        console.error(`[nodellmdebug] WARNING: Could not map TS line ${line} to compiled JS`);
+        console.error(
+          `[nodellmdebug] WARNING: Could not map TS line ${line} to compiled JS`,
+        );
         continue;
       }
       compiledToTsLine.set(compiledLine, line);
       console.error(
-        `[nodellmdebug] TS line ${line} ("${originalLines[line - 1]?.trim()}") -> compiled line ${compiledLine} ("${compiledLines[compiledLine]?.trim()}")`
+        `[nodellmdebug] TS line ${line} ("${
+          originalLines[line - 1]?.trim()
+        }") -> compiled line ${compiledLine} ("${
+          compiledLines[compiledLine]?.trim()
+        }")`,
       );
       const result = await cdp.send("Debugger.setBreakpoint", {
         location: {
@@ -367,7 +403,9 @@ async function main() {
           lineNumber: compiledLine,
         },
       });
-      console.error(`[nodellmdebug] Breakpoint set: ${JSON.stringify(result.result)}`);
+      console.error(
+        `[nodellmdebug] Breakpoint set: ${JSON.stringify(result.result)}`,
+      );
     }
 
     cdp.on("Debugger.paused", (params) => {
@@ -384,10 +422,14 @@ async function main() {
         const compiledLineNum = location.lineNumber as number; // 0-indexed
 
         // Map back to TS line number
-        const tsLineNum = compiledToTsLine.get(compiledLineNum) ?? (compiledLineNum + 1);
-        const sourceLine = originalLines[tsLineNum - 1]?.trim() ?? compiledLines[compiledLineNum]?.trim() ?? "";
+        const tsLineNum = compiledToTsLine.get(compiledLineNum) ??
+          (compiledLineNum + 1);
+        const sourceLine = originalLines[tsLineNum - 1]?.trim() ??
+          compiledLines[compiledLineNum]?.trim() ?? "";
 
-        console.error(`[nodellmdebug] Paused at TS line ${tsLineNum} (compiled: ${compiledLineNum})`);
+        console.error(
+          `[nodellmdebug] Paused at TS line ${tsLineNum} (compiled: ${compiledLineNum})`,
+        );
 
         // Capture locals from scope chain
         const locals = await captureLocalsFromScopes(cdp!, topFrame);
@@ -414,7 +456,7 @@ async function main() {
     // Wait for trigger to complete
     const triggerStatus = await triggerProc.status;
     console.error(
-      `[nodellmdebug] Trigger completed with status: ${triggerStatus.code}`
+      `[nodellmdebug] Trigger completed with status: ${triggerStatus.code}`,
     );
 
     // Give time for breakpoints to finish firing

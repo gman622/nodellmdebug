@@ -25,6 +25,12 @@ Deno.serve({ port: 3000 }, async (req: Request) => {
 
   const handlingFee = 5;
   const total = promoAmount + handlingFee + product.price;
-  const response = { product: product.name, price: product.price, promoAmount, handlingFee, total };
+  const response = {
+    product: product.name,
+    price: product.price,
+    promoAmount,
+    handlingFee,
+    total,
+  };
   return new Response(JSON.stringify(response));
 });
