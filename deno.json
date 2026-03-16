@@ -1,5 +1,5 @@
 {
-  "name": "@gman/llmdebug",
+  "name": "@gman622/llmdebug",
   "version": "0.1.0",
   "exports": "./src/main.ts",
   "compilerOptions": {
