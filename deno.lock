@@ -3,8 +3,10 @@
   "specifiers": {
     "jsr:@std/assert@*": "1.0.19",
     "jsr:@std/assert@^1.0.17": "1.0.19",
+    "jsr:@std/assert@^1.0.19": "1.0.19",
     "jsr:@std/internal@^1.0.12": "1.0.12",
-    "jsr:@std/testing@*": "1.0.17"
+    "jsr:@std/testing@*": "1.0.17",
+    "jsr:@std/testing@^1.0.17": "1.0.17"
   },
   "jsr": {
     "@std/assert@1.0.19": {
@@ -23,5 +25,11 @@
         "jsr:@std/internal"
       ]
     }
+  },
+  "workspace": {
+    "dependencies": [
+      "jsr:@std/assert@^1.0.19",
+      "jsr:@std/testing@^1.0.17"
+    ]
   }
 }
