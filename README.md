@@ -4,7 +4,17 @@ A debugger built for LLMs. Captures full execution state in a single pass —
 every variable, every branch — so an LLM can reason about bugs from actual
 runtime data instead of guessing from static code.
 
-## Quick start
+## Install
+
+```bash
+deno run --allow-all jsr:@gman622/llmdebug \
+  --run "deno run --inspect --allow-net your-app.ts" \
+  --target "your-app.ts" \
+  --lines "9,11,13" \
+  --trigger "curl http://localhost:3000/your-endpoint"
+```
+
+Or run from source:
 
 ```bash
 deno run --allow-all src/main.ts \
