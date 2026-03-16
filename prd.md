@@ -10,7 +10,7 @@ correctly. We do the same thing — but in batch.
 ### The buggy app (we ship this as a test fixture)
 
 ```ts
-// test-app/server.ts
+// test_app/server.ts
 const users = [
   { name: "Alice", role: "admin" },
   { name: "Bob", role: "user" },
@@ -45,7 +45,7 @@ proves the tool works on a case where we already know the answer.
 
 ```json
 {
-  "file": "test-app/server.ts",
+  "file": "test_app/server.ts",
   "trigger": "curl http://localhost:3000/api/users?role=admin",
   "steps": [
     {
@@ -108,9 +108,9 @@ That's the bug. Two simple checks on structured data.
 - Nonzero exit code on connection failure or crash
 - Process launch and teardown via `sh -c`
 - Two test fixtures:
-  - `test-app/server.ts` — logic bug (static analysis can catch it)
-  - `test-app/order-server.ts` — data bug (only the debugger catches it)
-- BDD test suite (`test-app/order_test.ts`)
+  - `test_app/server.ts` — logic bug (static analysis can catch it)
+  - `test_app/order_server.ts` — data bug (only the debugger catches it)
+- BDD test suite (`test_app/order_test.ts`)
 
 ## Scope — what's NOT in the skateboard
 

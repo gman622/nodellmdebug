@@ -34,8 +34,8 @@ all users regardless:
 
 ```bash
 deno run --allow-all src/main.ts \
-  --run "deno run --inspect --allow-net test-app/server.ts" \
-  --target "test-app/server.ts" \
+  --run "deno run --inspect --allow-net test_app/server.ts" \
+  --target "test_app/server.ts" \
   --lines "9,11,13" \
   --trigger "curl http://localhost:3000/api/users?role=admin"
 ```
@@ -49,10 +49,10 @@ A promo code server where the code is correct but a legacy CSV import wrote
 concatenates instead of adding:
 
 ```bash
-deno run --allow-all --unstable-kv test-app/seed.ts
+deno run --allow-all --unstable-kv test_app/seed.ts
 deno run --allow-all src/main.ts \
-  --run "deno run --inspect --allow-net --unstable-kv test-app/order-server.ts" \
-  --target "test-app/order-server.ts" \
+  --run "deno run --inspect --allow-net --unstable-kv test_app/order_server.ts" \
+  --target "test_app/order_server.ts" \
   --lines "21,26,27" \
   --trigger "curl 'http://localhost:3000/?product=mouse&promo=WELCOME'"
 ```

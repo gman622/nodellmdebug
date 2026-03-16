@@ -57,47 +57,60 @@ The LLM does everything itself:
 No F5. No IDE. No human clicking buttons. The LLM has full control of the debug
 lifecycle from the terminal.
 
-## CLI interface (planned)
+## CLI interface
 
 ```bash
-# Full self-contained debug session — launches the process, debugs, and tears down
-nodellmdebug --run "deno run --inspect --allow-net --unstable-kv src/main.ts" \
-  --target src/routes/videoGames.ts --function handleVideoGames \
-  --trigger "curl http://localhost:3000/api/videogames"
-
-# Attach to an already-running process
-nodellmdebug --attach localhost:9229 \
-  --target src/db.ts --lines 24-32 \
-  --trigger "curl -X POST http://localhost:3000/api/videogames -d '{...}'"
+deno run --allow-all jsr:@gman622/llmdebug \
+  --run "deno run --inspect --allow-net your-app.ts" \
+  --target "your-app.ts" \
+  --lines "9,11,13" \
+  --trigger "curl http://localhost:3000/your-endpoint"
 ```
 
-## Output format (planned)
+Arguments:
+
+- `--run`: Command to launch the target process (must include `--inspect`)
+- `--target`: Source file to set breakpoints in
+- `--lines`: Comma-separated line numbers (1-indexed)
+- `--trigger`: Command that causes the target code to execute
+
+## Output format
 
 ```json
 {
-  "file": "src/routes/videoGames.ts",
-  "function": "handleVideoGames",
-  "trigger": "curl http://localhost:3000/api/videogames",
+  "file": "test_app/server.ts",
+  "trigger": "curl http://localhost:3000/?role=admin",
   "steps": [
     {
-      "line": 5,
-      "source": "const url = new URL(req.url);",
+      "line": 9,
+      "source": "const role = url.searchParams.get(\"role\");",
       "locals": {
-        "req": {
-          "method": "GET",
-          "url": "http://localhost:3000/api/videogames"
-        }
+        "req": "[Request]",
+        "url": "http://localhost:3000/?role=admin"
       }
     },
     {
-      "line": 6,
-      "source": "const path = url.pathname;",
+      "line": 11,
+      "source": "const filtered = users.filter((u) => u.role === role);",
+      "locals": { "role": "admin" }
+    },
+    {
+      "line": 13,
+      "source": "return new Response(JSON.stringify(users));",
       "locals": {
-        "req": "...",
-        "url": "http://localhost:3000/api/videogames",
-        "path": "/api/videogames"
+        "role": "admin",
+        "filtered": [{ "name": "Alice", "role": "admin" }]
       }
     }
   ]
 }
 ```
+
+## Testing
+
+```bash
+deno test --allow-all --unstable-kv src/main_test.ts
+```
+
+Integration tests in `src/main_test.ts` cover all 4 test fixtures, error
+handling, edge cases, and output format validation (46 test steps).

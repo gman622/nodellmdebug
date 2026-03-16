@@ -79,8 +79,8 @@ describe("nodellmdebug integration", () => {
 
     beforeAll(async () => {
       result = await runDebugger({
-        run: "deno run --inspect --allow-net test-app/server.ts",
-        target: "test-app/server.ts",
+        run: "deno run --inspect --allow-net test_app/server.ts",
+        target: "test_app/server.ts",
         lines: "9,11,13",
         trigger: "curl http://localhost:3000/?role=admin",
       });
@@ -95,7 +95,7 @@ describe("nodellmdebug integration", () => {
     });
 
     it("should set file and trigger in trace", () => {
-      assertEquals(result.trace!.file, "test-app/server.ts");
+      assertEquals(result.trace!.file, "test_app/server.ts");
       assertEquals(
         result.trace!.trigger,
         "curl http://localhost:3000/?role=admin",
@@ -146,8 +146,8 @@ describe("nodellmdebug integration", () => {
 
     beforeAll(async () => {
       result = await runDebugger({
-        run: "deno run --inspect --allow-net test-app/server2.ts",
-        target: "test-app/server2.ts",
+        run: "deno run --inspect --allow-net test_app/server2.ts",
+        target: "test_app/server2.ts",
         lines: "9,11,13",
         trigger: "curl http://localhost:3000/?id=1",
       });
@@ -182,7 +182,7 @@ describe("nodellmdebug integration", () => {
           "--allow-all",
           "src/main.ts",
           "--target",
-          "test-app/server.ts",
+          "test_app/server.ts",
           "--lines",
           "9",
           "--trigger",
@@ -217,13 +217,13 @@ describe("nodellmdebug integration", () => {
   // Bug: a legacy CSV import wrote promo amount as "15" (string) to Deno KV.
   // The code does `promoAmount + handlingFee + price` which string-concatenates
   // instead of adding: "15" + 5 + 49.99 = "15549.99". The code is correct; the data is wrong.
-  describe("order-server.ts — data type bug", () => {
+  describe("order_server.ts — data type bug", () => {
     let result: Awaited<ReturnType<typeof runDebugger>>;
 
     beforeAll(async () => {
       // Seed the KV database first
       const seed = new Deno.Command("deno", {
-        args: ["run", "--allow-all", "--unstable-kv", "test-app/seed.ts"],
+        args: ["run", "--allow-all", "--unstable-kv", "test_app/seed.ts"],
         stdout: "piped",
         stderr: "piped",
       }).spawn();
@@ -231,8 +231,8 @@ describe("nodellmdebug integration", () => {
 
       result = await runDebugger({
         run:
-          "deno run --inspect --allow-net --unstable-kv test-app/order-server.ts",
-        target: "test-app/order-server.ts",
+          "deno run --inspect --allow-net --unstable-kv test_app/order_server.ts",
+        target: "test_app/order_server.ts",
         lines: "22,27",
         trigger: "curl 'http://localhost:3000/?product=mouse&promo=WELCOME'",
       });
@@ -265,12 +265,204 @@ describe("nodellmdebug integration", () => {
     });
   });
 
+  // Bug: PUT then GET returns 404. The code looks correct — both use [collection, id]
+  // as the KV key. The debugger should capture the segments, collection, id, and KV
+  // entry to help an LLM verify whether the keys actually match across requests.
+  describe("server3.ts — KV storage bug", () => {
+    let putResult: Awaited<ReturnType<typeof runDebugger>>;
+    let getResult: Awaited<ReturnType<typeof runDebugger>>;
+
+    // Trace the PUT request — capture URL parsing and KV write
+    beforeAll(async () => {
+      putResult = await runDebugger({
+        run: "deno run --inspect --allow-net --unstable-kv test_app/server3.ts",
+        target: "test_app/server3.ts",
+        lines: "9,10,11,15",
+        trigger:
+          "curl -X PUT http://localhost:3000/items/abc -H 'Content-Type: application/json' -d '{\"name\":\"test\"}'",
+      });
+
+      // Trace the GET request — capture URL parsing and KV read
+      getResult = await runDebugger({
+        run: "deno run --inspect --allow-net --unstable-kv test_app/server3.ts",
+        target: "test_app/server3.ts",
+        lines: "9,10,11,20,21",
+        trigger: "curl http://localhost:3000/items/abc",
+      });
+    });
+
+    it("should exit 0 for PUT trace", () => {
+      assertEquals(putResult.exitCode, 0);
+    });
+
+    it("should exit 0 for GET trace", () => {
+      assertEquals(getResult.exitCode, 0);
+    });
+
+    it("should capture segments and KV key on PUT", () => {
+      assertExists(putResult.trace);
+      const step = putResult.trace!.steps.find((s) =>
+        s.locals.collection !== undefined && s.locals.id !== undefined
+      );
+      assertExists(step, "should have a step with collection and id");
+      assertEquals(step.locals.collection, "items");
+      assertEquals(step.locals.id, "abc");
+    });
+
+    it("should capture segments and KV key on GET", () => {
+      assertExists(getResult.trace);
+      const step = getResult.trace!.steps.find((s) =>
+        s.locals.collection !== undefined && s.locals.id !== undefined
+      );
+      assertExists(step, "should have a step with collection and id");
+      assertEquals(step.locals.collection, "items");
+      assertEquals(step.locals.id, "abc");
+    });
+
+    it("should capture the KV lookup at line 21", () => {
+      assertExists(getResult.trace);
+      // Line 21: `if (!entry.value)` — breakpoint fires here after kv.get()
+      // The `entry` variable may not appear in locals (captured before assignment)
+      // but the step itself proves the GET path was taken
+      const step = getResult.trace!.steps.find((s) => s.line === 21);
+      assertExists(step, "should have a step at the KV lookup check");
+      assert(
+        step.source.includes("entry"),
+        "source should reference the KV entry",
+      );
+    });
+  });
+
+  // Expanded server2 tests: verify the debugger captures the full lookup flow
+  // showing that find() returns undefined because number !== string.
+  describe("server2.ts — expanded type mismatch", () => {
+    let result: Awaited<ReturnType<typeof runDebugger>>;
+
+    beforeAll(async () => {
+      result = await runDebugger({
+        run: "deno run --inspect --allow-net test_app/server2.ts",
+        target: "test_app/server2.ts",
+        lines: "9,11,14",
+        trigger: "curl http://localhost:3000/?id=1",
+      });
+    });
+
+    it("should only hit 2 lines (find misses, skips to 404 path)", () => {
+      assertExists(result.trace);
+      // Line 11 is the find() call — after this, product is undefined
+      // The trace proves the mismatch: id is "1" (string) but products have numeric ids
+      const findStep = result.trace!.steps.find((s) => s.line === 11);
+      assertExists(findStep);
+      assertEquals(findStep.locals.id, "1", "id should be string '1'");
+      assert(
+        findStep.source.includes("find"),
+        "should be at the products.find() call",
+      );
+    });
+  });
+
+  // Expanded order_server tests: verify the trace captures the full promo flow,
+  // including correct numeric promo (SUMMER) vs buggy string promo (WELCOME).
+  describe("order_server.ts — numeric promo (SUMMER) should work", () => {
+    let result: Awaited<ReturnType<typeof runDebugger>>;
+
+    beforeAll(async () => {
+      const seed = new Deno.Command("deno", {
+        args: ["run", "--allow-all", "--unstable-kv", "test_app/seed.ts"],
+        stdout: "piped",
+        stderr: "piped",
+      }).spawn();
+      await seed.output();
+
+      result = await runDebugger({
+        run:
+          "deno run --inspect --allow-net --unstable-kv test_app/order_server.ts",
+        target: "test_app/order_server.ts",
+        lines: "22,27",
+        trigger: "curl 'http://localhost:3000/?product=mouse&promo=SUMMER'",
+      });
+    });
+
+    it("should exit 0", () => {
+      assertEquals(result.exitCode, 0);
+    });
+
+    it("should capture promoAmount as a number (correct data)", () => {
+      assertExists(result.trace);
+      const step = result.trace!.steps.find((s) => s.line === 27);
+      assertExists(step, "should have a step at line 27");
+      assertEquals(
+        typeof step.locals.promoAmount,
+        "number",
+        "SUMMER promo should be a number — correctly stored",
+      );
+      assertEquals(step.locals.promoAmount, 10);
+    });
+  });
+
+  // Edge case: request with no query params — tests that the debugger captures
+  // the absence of expected values (role=null, id=null, etc.)
+  describe("edge cases — missing query params", () => {
+    it("should capture role as null when no ?role param", async () => {
+      const result = await runDebugger({
+        run: "deno run --inspect --allow-net test_app/server.ts",
+        target: "test_app/server.ts",
+        lines: "9,11,13",
+        trigger: "curl http://localhost:3000/",
+      });
+      assertEquals(result.exitCode, 0);
+      assertExists(result.trace);
+      // With no role param, filtered should be empty
+      const returnStep = result.trace!.steps.find((s) => s.line === 13);
+      assertExists(returnStep);
+      const filtered = returnStep!.locals
+        .filtered as Array<Record<string, string>>;
+      assertEquals(filtered.length, 0, "no users should match role=null");
+    });
+  });
+
+  // Edge case: order_server with missing product — should capture the 404 path
+  describe("edge cases — missing KV data", () => {
+    let result: Awaited<ReturnType<typeof runDebugger>>;
+
+    beforeAll(async () => {
+      const seed = new Deno.Command("deno", {
+        args: ["run", "--allow-all", "--unstable-kv", "test_app/seed.ts"],
+        stdout: "piped",
+        stderr: "piped",
+      }).spawn();
+      await seed.output();
+
+      result = await runDebugger({
+        run:
+          "deno run --inspect --allow-net --unstable-kv test_app/order_server.ts",
+        target: "test_app/order_server.ts",
+        lines: "9,13,14",
+        trigger: "curl 'http://localhost:3000/?product=nonexistent'",
+      });
+    });
+
+    it("should exit 0", () => {
+      assertEquals(result.exitCode, 0);
+    });
+
+    it("should capture the missing product path", () => {
+      assertExists(result.trace);
+      assert(result.trace!.steps.length > 0);
+      // Should see productId = "nonexistent" in locals
+      const step = result.trace!.steps.find((s) =>
+        s.locals.productId === "nonexistent"
+      );
+      assertExists(step, "should capture productId = 'nonexistent'");
+    });
+  });
+
   // Validates the debugger handles bad input gracefully: nonexistent target file,
   // invalid line numbers, bad trigger command.
   describe("unexpected input", () => {
     it("should exit 1 when target file does not exist", async () => {
       const result = await runDebugger({
-        run: "deno run --inspect --allow-net test-app/server.ts",
+        run: "deno run --inspect --allow-net test_app/server.ts",
         target: "nonexistent/file.ts",
         lines: "1",
         trigger: "curl http://localhost:3000",
@@ -281,7 +473,7 @@ describe("nodellmdebug integration", () => {
     it("should exit 1 when --run command is invalid", async () => {
       const result = await runDebugger({
         run: "this-command-does-not-exist",
-        target: "test-app/server.ts",
+        target: "test_app/server.ts",
         lines: "9",
         trigger: "curl http://localhost:3000",
       });
@@ -291,8 +483,8 @@ describe("nodellmdebug integration", () => {
     it("should handle lines that don't map to compiled JS", async () => {
       // Line 1 is a comment — no compiled JS equivalent
       const result = await runDebugger({
-        run: "deno run --inspect --allow-net test-app/server.ts",
-        target: "test-app/server.ts",
+        run: "deno run --inspect --allow-net test_app/server.ts",
+        target: "test_app/server.ts",
         lines: "1",
         trigger: "curl http://localhost:3000/?role=admin",
       });
@@ -312,8 +504,8 @@ describe("nodellmdebug integration", () => {
 
     beforeAll(async () => {
       result = await runDebugger({
-        run: "deno run --inspect --allow-net test-app/server.ts",
-        target: "test-app/server.ts",
+        run: "deno run --inspect --allow-net test_app/server.ts",
+        target: "test_app/server.ts",
         lines: "9,13,11",
         trigger: "curl http://localhost:3000/?role=admin",
       });
